@@ -5,6 +5,11 @@ import { Reading, UNIT_LABELS, UTILITY_LABELS, UTILITY_UNITS } from "@/lib/types
 
 const COLLAPSED_COUNT = 9;
 
+function formatDateDE(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
+}
+
 interface Props {
   readings: Reading[];
   filterUnit: string;
@@ -60,7 +65,7 @@ export default function ReadingsTable({
             ) : (
               visible.map((r) => (
                 <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3">{r.date}</td>
+                  <td className="px-6 py-3">{formatDateDE(r.date)}</td>
                   <td className="px-6 py-3">{UNIT_LABELS[r.unit]}</td>
                   <td className="px-6 py-3">
                     <span

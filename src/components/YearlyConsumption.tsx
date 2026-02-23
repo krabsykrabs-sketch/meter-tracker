@@ -106,7 +106,7 @@ export default function YearlyConsumption({ readings, filterUnit, filterUtility 
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      <h2 className="text-lg font-semibold p-6 pb-0">Jahresverbrauch</h2>
+      <h2 className="text-lg font-semibold p-6 pb-0">Jahresverbrauch{filterUtility ? ` ${UTILITY_LABELS[filterUtility]}` : ""}</h2>
       <p className="text-xs text-gray-500 px-6 mt-1">
         Geschätzter Gesamtverbrauch pro Kalenderjahr (interpoliert auf 01.01. – 31.12.).
       </p>

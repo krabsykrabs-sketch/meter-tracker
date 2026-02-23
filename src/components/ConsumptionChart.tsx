@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
 import {
   ComposedChart,
   Line,
@@ -202,6 +203,81 @@ function CustomTooltip({
   );
 }
 
+const SLIDER_STEPS = 1000;
+
+function TimeRangeSlider({
+  min,
+  max,
+  start,
+  end,
+  onChange,
+}: {
+  min: number;
+  max: number;
+  start: number;
+  end: number;
+  onChange: (start: number, end: number) => void;
+}) {
+  const toSlider = (ts: number) =>
+    Math.round(((ts - min) / (max - min)) * SLIDER_STEPS);
+  const fromSlider = (val: number) =>
+    min + (val / SLIDER_STEPS) * (max - min);
+
+  const leftVal = toSlider(start);
+  const rightVal = toSlider(end);
+  const leftPct = (leftVal / SLIDER_STEPS) * 100;
+  const rightPct = (rightVal / SLIDER_STEPS) * 100;
+
+  const isFullRange = start <= min && end >= max;
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-gray-600 font-medium">
+          {formatMonthYear(start)} – {formatMonthYear(end)}
+        </span>
+        {!isFullRange && (
+          <button
+            className="text-xs text-blue-600 hover:underline"
+            onClick={() => onChange(min, max)}
+          >
+            Alles anzeigen
+          </button>
+        )}
+      </div>
+      <div className="range-slider-container">
+        <div className="range-slider-track" />
+        <div
+          className="range-slider-range"
+          style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
+        />
+        <input
+          type="range"
+          min={0}
+          max={SLIDER_STEPS}
+          value={leftVal}
+          onChange={(e) => {
+            const val = Math.min(Number(e.target.value), rightVal - 10);
+            onChange(fromSlider(val), end);
+          }}
+          className="range-slider-input"
+        />
+        <input
+          type="range"
+          min={0}
+          max={SLIDER_STEPS}
+          value={rightVal}
+          onChange={(e) => {
+            const val = Math.max(Number(e.target.value), leftVal + 10);
+            onChange(start, fromSlider(val));
+          }}
+          className="range-slider-input"
+        />
+      </div>
+    </div>
+  );
+}
+
 function ChartLegend({ seriesKeys }: { seriesKeys: SeriesInfo[] }) {
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-1 justify-center mt-2 text-sm">
@@ -224,7 +300,22 @@ function ChartLegend({ seriesKeys }: { seriesKeys: SeriesInfo[] }) {
 }
 
 export default function ConsumptionChart({ readings, filterUnit, filterUtility }: Props) {
-  const { points, seriesKeys } = computeConsumption(readings, filterUnit, filterUtility);
+  const { points, seriesKeys } = useMemo(
+    () => computeConsumption(readings, filterUnit, filterUtility),
+    [readings, filterUnit, filterUtility]
+  );
+
+  const dataMin = points.length > 0 ? points[0].timestamp : 0;
+  const dataMax = points.length > 0 ? points[points.length - 1].timestamp : 0;
+
+  const [rangeStart, setRangeStart] = useState(dataMin);
+  const [rangeEnd, setRangeEnd] = useState(dataMax);
+
+  // Reset range when data bounds change (new readings or filter change)
+  useEffect(() => {
+    setRangeStart(dataMin);
+    setRangeEnd(dataMax);
+  }, [dataMin, dataMax]);
 
   if (points.length === 0) {
     return (
@@ -234,9 +325,10 @@ export default function ConsumptionChart({ readings, filterUnit, filterUtility }
     );
   }
 
-  const minTs = points[0].timestamp;
-  const maxTs = points[points.length - 1].timestamp;
-  const bands = buildSeasonBands(minTs, maxTs);
+  const visiblePoints = points.filter(
+    (p) => p.timestamp >= rangeStart && p.timestamp <= rangeEnd
+  );
+  const bands = buildSeasonBands(rangeStart, rangeEnd);
   const utilityUnit = filterUtility ? `${UTILITY_UNITS[filterUtility]}/Monat` : "/Monat";
 
   return (
@@ -252,7 +344,7 @@ export default function ConsumptionChart({ readings, filterUnit, filterUtility }
         </span>
       </p>
       <ResponsiveContainer width="100%" height={400}>
-        <ComposedChart data={points}>
+        <ComposedChart data={visiblePoints}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
 
           {bands.map((band, i) => (
@@ -270,7 +362,7 @@ export default function ConsumptionChart({ readings, filterUnit, filterUtility }
             dataKey="timestamp"
             type="number"
             scale="time"
-            domain={[minTs, maxTs]}
+            domain={[rangeStart, rangeEnd]}
             tickFormatter={formatMonthYear}
             tick={{ fontSize: 11 }}
             angle={-30}
@@ -311,6 +403,16 @@ export default function ConsumptionChart({ readings, filterUnit, filterUtility }
         </ComposedChart>
       </ResponsiveContainer>
       <ChartLegend seriesKeys={seriesKeys} />
+      <TimeRangeSlider
+        min={dataMin}
+        max={dataMax}
+        start={rangeStart}
+        end={rangeEnd}
+        onChange={(s, e) => {
+          setRangeStart(s);
+          setRangeEnd(e);
+        }}
+      />
     </div>
   );
 }
